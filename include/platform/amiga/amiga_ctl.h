@@ -25,14 +25,17 @@ typedef enum {
 #define AMIGA_CMD_OUT_MAX 80
 
 #define AMIGA_NET_SCAN_MAX FN_WIFI_MAX_SCAN_RECORDS
-#define AMIGA_NET_ROWS 12
+#define AMIGA_NET_ROWS 13
 
 /* What the Configuration window shows: its Device and Network tabs, and
- * the Join picker that Network > Join... opens in place of its rows. */
+ * the Join picker that Network > Join... opens in place of its rows, and
+ * the rate picker and wait that Device > Change rate... opens. */
 enum {
   AMIGA_NET_VIEW_DEVICE = 0,
   AMIGA_NET_VIEW_NETWORK,
-  AMIGA_NET_VIEW_JOIN
+  AMIGA_NET_VIEW_JOIN,
+  AMIGA_NET_VIEW_RATE,       /* Device > Change rate...: the rate picker */
+  AMIGA_NET_VIEW_RATE_WAIT   /* waiting for the FujiNet at the new rate */
 };
 
 /* Configuration window data, re-read by amiga_ctl_net_refresh.  A have_*
@@ -50,6 +53,8 @@ typedef struct {
   fn_fuji_info_t info;              /* FujiDevice GetInfo: firmware, profile */
   uint8_t scan_count;
   fn_wifi_scan_record_t scan[AMIGA_NET_SCAN_MAX];
+  uint32_t baud;           /* serial rate; shown when have_baud */
+  uint8_t have_baud;
   uint8_t view;            /* AMIGA_NET_VIEW_* */
 } amiga_net_t;
 

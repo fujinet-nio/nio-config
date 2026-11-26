@@ -67,7 +67,53 @@ contains only this project's own files and an original boot block, so it can
 be shared. The same disk boots on every Kickstart from 1.3. The ROM supplies
 exec, dos, intuition and graphics, and its shell runs the disk's
 `S/Startup-Sequence`, which loads the FujiNet devices, selects the FujiNet
-serial driver and runs `Tools/config-nio`.
+serial driver, sets the RS-232 rate to 38400 and runs `Tools/config-nio`.
+
+**Set the FujiNet to 38400 too** (on its console: `uart.baud 38400`, then
+`uart.save`); the two ends must match. The rate comes from `S:FujiNet-Config`,
+which the disk ships with `BAUD=38400`; `S/Startup-Sequence` runs
+`C:fujinet-nio-baud FROM=S:FujiNet-Config` to apply it. To change it, use
+Config's **Serial rate** setting (Configuration window, Device tab, **Rate...**;
+see `docs/amiga-config.md`). It tests the new rate with the FujiNet and then
+saves `BAUD=<rate>` in `S:FujiNet-Config`, keeping any other lines, so no
+editor is needed. You can also edit the one-line file on another machine
+(for example with `xdftool`). For one session, quit Config and type
+`C:fujinet-nio-baud <rate>` then `Tools/config-nio` at the boot CLI.
+
+`fujinet-nio-baud FROM=<file>` is silent and returns 0 when the file (or its
+volume) is missing. A bad or missing `BAUD=` value, or any other failure,
+prints one line and returns 5; it never returns 20.
+
+The Workbench disks (`wb204`, `wb13`) and the installers (`Install-HD`,
+`Install-config-nio`, `Install-FujiNet-WB13`) ship `C:fujinet-nio-baud` and a
+default `S:FujiNet-Config` as well, now at 38400 (the Workbench disks
+previously ran at the driver's built-in 19200). In the NIO package drawer the
+default is `FujiNet-Config.default` (a plain `FujiNet-Config` there would sit
+beside Config's `FujiNet-Config.info` icon); the installers copy it to
+`S:FujiNet-Config`, and only when none exists. The `wb204` floppy holds the
+real `S/FujiNet-Config`, which `Install-HD` copies.
+
+`Install-HD` and `Install-config-nio` append the boot line to
+`S:User-Startup`, before `Run >NIL: C:fmountrestore` on a new install. On an
+upgrade (`S:User-Startup` already loads `fujinet-nio.device`) they keep the
+rate the system ran at:
+
+- If `S:User-Startup` already has a `fujinet-nio-baud` line (your own, or the
+  `FROM=` line from an earlier run), nothing is added and no
+  `S:FujiNet-Config` is created. If it is not the `FROM=` line, the installer
+  says so: switch it to `C:fujinet-nio-baud FROM=S:FujiNet-Config` to let
+  Config change the rate.
+- Otherwise the system ran at 19200, so the installer writes
+  `S:FujiNet-Config` with `BAUD=19200` (if none exists) and appends the
+  `FROM=` line. If `S:User-Startup` already runs `fmountrestore`, the line
+  lands after it, and the installer asks you to move it above
+  `Run >NIL: C:fmountrestore`, so the rate is set before the drives are
+  mounted in the background.
+
+`Install-config-nio` always replaces `C:fujinet-nio-baud`, because an older
+one has no `FROM=` form. `Install-FujiNet-WB13` tells you to add the boot line
+to `S:StartupII`, on a new install and again when it refreshes an existing
+one; the FujiNet must be set to the rate in `S:FujiNet-Config`.
 
 A bare system differs from a Workbench one in ways that matter here, all
 found by testing:
@@ -79,7 +125,8 @@ found by testing:
   `fujinet-nio-serial`.
 - **clib2 programs crash** (`#80000003`) on a bare system, so the Workbench 3.x
   tool set cannot be used as built. `make amiga-bootdisk-tools` rebuilds
-  `fmount`, `fumount` and `fujinet-nio-serial` against the 2.0 headers and links
+  `fmount`, `fumount`, `fujinet-nio-serial` and `fujinet-nio-baud` against the
+  2.0 headers and links
   them with the libnix `nix13` runtime, as config-nio is (this uses the
   `AMIGA_COMPILE_CRT` setting in `nio-core-apps`). `fmount` and `fumount` pick
   their drive model at run time: the Kickstart 1.3 drives below, or the dynamic
@@ -101,6 +148,17 @@ on both ROMs:
 - Kickstart 2.04 (68000, ECS): a Config SCRIPT run (insert, eject, insert on
   `DN3:`) ends `ok=5 err=0`, `Dir DN3:` lists the image, and `fumount DN3:`
   ejects it.
+
+Verified on hardware at 38400 (2026-11-24):
+- Stock Amiga 2000, Kickstart 1.3.
+- PiStorm with Emu68 1.0.7, Kickstart 1.3, **with Zorro II RAM enabled**
+  (`z2_ram_size=8` in `cmdline.txt`; Emu68 1.1 uses
+  `dtoverlay=z2ram,size=8` in `config.txt`). Without it the Amiga loses
+  received bytes, and the loss gets worse as the reply gets longer: "FujiNet
+  error 16" loading the host list, "Browse failed: error 3", "Unable to read
+  catalogue", and `fmount` "Unsupported candidate media". 57600 still failed
+  with Zorro II RAM.
+- PiStorm with Emu68, Kickstart 3.1 (also works at 57600).
 
 Known limits:
 - On Kickstart 1.3, only the OFS drives (`DO`/`HO`) work. The FFS drives need
